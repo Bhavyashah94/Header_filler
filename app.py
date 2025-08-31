@@ -1,9 +1,10 @@
 import streamlit as st
 from docxtpl import DocxTemplate
 import subprocess
+import tempfile
 import os
 
-st.title("Academic Header Page Filler - DOCX & PDF")
+st.title("Academic Header Page Filler - DOCX & PDF (Safe for Multiple Users)")
 
 with st.form("header_form"):
     year = st.text_input("Academic Year", "2025-26", max_chars=9)
@@ -29,7 +30,11 @@ with st.form("header_form"):
     submitted = st.form_submit_button("Generate DOCX & PDF")
 
 if submitted:
-    # Generate DOCX
+    # --- Use temp files ---
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp_docx:
+        docx_file = tmp_docx.name
+
+    # Create DOCX
     doc = DocxTemplate("Header.docx")
     context = {
         "year": year,
@@ -47,25 +52,27 @@ if submitted:
         "dos": dos.strftime("%d-%m-%Y"),
     }
     doc.render(context)
-
-    safe_subject = subject.replace(" ", "_")
-    safe_number = number.replace(" ", "_")
-    docx_file = f"{safe_subject}_{safe_number}.docx"
-    pdf_file = f"{safe_subject}_{safe_number}.pdf"
-
     doc.save(docx_file)
 
-    # Convert DOCX -> PDF using LibreOffice headless
+    # Convert DOCX -> PDF in temp file
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
+        pdf_file = tmp_pdf.name
+
     subprocess.run([
         "libreoffice",
         "--headless",
         "--convert-to", "pdf",
-        "--outdir", ".",
+        "--outdir", os.path.dirname(pdf_file),
         docx_file
     ], check=True)
 
-    # Download buttons
+    # Assign friendly names only for download
+    friendly_base = f"{subject.replace(' ','_')}_{number.replace(' ','_')}"
     with open(docx_file, "rb") as f:
-        st.download_button("Download DOCX", f, file_name=docx_file)
+        st.download_button("Download DOCX", f, file_name=f"{friendly_base}.docx")
     with open(pdf_file, "rb") as f:
-        st.download_button("Download PDF", f, file_name=pdf_file)
+        st.download_button("Download PDF", f, file_name=f"{friendly_base}.pdf")
+
+    # Optionally clean up temp files
+    os.remove(docx_file)
+    os.remove(pdf_file)
