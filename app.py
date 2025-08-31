@@ -1,7 +1,9 @@
 import streamlit as st
 from docxtpl import DocxTemplate
+import subprocess
+import os
 
-st.title("Academic Header Page Filler")
+st.title("Academic Header Page Filler - DOCX & PDF")
 
 with st.form("header_form"):
     year = st.text_input("Academic Year", "2025-26", max_chars=9)
@@ -24,11 +26,11 @@ with st.form("header_form"):
     dop = st.date_input("Date of Performance")
     dos = st.date_input("Date of Submission")
 
-    submitted = st.form_submit_button("Generate DOCX")
+    submitted = st.form_submit_button("Generate DOCX & PDF")
 
 if submitted:
+    # Generate DOCX
     doc = DocxTemplate("Header.docx")
-
     context = {
         "year": year,
         "sem": sem,
@@ -44,13 +46,26 @@ if submitted:
         "dop": dop.strftime("%d-%m-%Y"),
         "dos": dos.strftime("%d-%m-%Y"),
     }
-
     doc.render(context)
+
     safe_subject = subject.replace(" ", "_")
     safe_number = number.replace(" ", "_")
-    output_file = f"{safe_subject}_{safe_number}.docx"
+    docx_file = f"{safe_subject}_{safe_number}.docx"
+    pdf_file = f"{safe_subject}_{safe_number}.pdf"
 
-    doc.save(output_file)
+    doc.save(docx_file)
 
-    with open(output_file, "rb") as f:
-        st.download_button("Download Filled Header", f, file_name=output_file)
+    # Convert DOCX -> PDF using LibreOffice headless
+    subprocess.run([
+        "libreoffice",
+        "--headless",
+        "--convert-to", "pdf",
+        "--outdir", ".",
+        docx_file
+    ], check=True)
+
+    # Download buttons
+    with open(docx_file, "rb") as f:
+        st.download_button("Download DOCX", f, file_name=docx_file)
+    with open(pdf_file, "rb") as f:
+        st.download_button("Download PDF", f, file_name=pdf_file)
